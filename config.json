@@ -13,24 +13,24 @@
       "enabled": true,
       "midi_note": 0,
       "keyboard_key": "q",
-      "file": "OrganGame.wav",
+      "file": "secondloop.wav",
       "volume": 1.0,
       "loop": true,
       "stop_on_release": false
     },
     {
       "name": "FX_HIT",
-      "enabled": true,
+      "enabled": false,
       "midi_note": 0,
       "keyboard_key": "w",
-      "file": "third.wav",
+      "file": "example.wav",
       "volume": 1.0,
       "loop": true,
       "stop_on_release": false
     },
     {
       "name": "PAD_HOLD",
-      "enabled": true,
+      "enabled": false,
       "midi_note": 0,
       "keyboard_key": "e",
       "file": "PadHold.wav",
