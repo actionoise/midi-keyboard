@@ -75,3 +75,5 @@ TROUBLESHOOTING
 - ensure notes are within range
 
 Additional demonstration videos will be published soon to showcase the system in real-world scenarios.
+
+First Video demo: https://www.youtube.com/watch?v=o6R80QeBPDw
