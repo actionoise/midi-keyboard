@@ -1,0 +1,197 @@
+{
+  "instrument_file": "DoPiano.wav",
+  "instrument_root_note": 60,
+  "midi_device_id": 17,
+  "skip_ms": 0.0,
+  "threshold": 0.01,
+  "note_min": 36,
+  "note_max": 96,
+
+  "special_notes": [   
+    {
+      "name": "ORGAN_LOOP",
+      "enabled": true,
+      "midi_note": 0,
+      "keyboard_key": "q",
+      "file": "OrganGame.wav",
+      "volume": 1.0,
+      "loop": true,
+      "stop_on_release": false
+    },
+    {
+      "name": "FX_HIT",
+      "enabled": true,
+      "midi_note": 0,
+      "keyboard_key": "w",
+      "file": "third.wav",
+      "volume": 1.0,
+      "loop": true,
+      "stop_on_release": false
+    },
+    {
+      "name": "PAD_HOLD",
+      "enabled": true,
+      "midi_note": 0,
+      "keyboard_key": "e",
+      "file": "PadHold.wav",
+      "volume": 0.8,
+      "loop": false,
+      "stop_on_release": true
+    }
+  ],
+
+  "base_volume": 0.8,
+  "drive": 0.0,
+  "output_gain": 1.0,
+
+  "delay_ms": 0.0,
+  "delay_feedback": 0.0,
+  "delay_mix": 0.0,
+
+  "spring_mix": 0.25,
+  "spring_decay": 0.6,
+  "spring_tone": 0.7,
+
+  "repeater_ms": 80.0,
+  "repeater_repeats": 4,
+  "repeater_decay": 0.55,
+  "repeater_mix": 0.45,
+
+  "loops": [
+    {
+      "name": "LOOP1",
+      "channel": 10,
+      "record_note": 40,
+      "play_note": 36,
+      "volume_cc": 30,
+      "volume_channel": 1
+    },
+    {
+      "name": "LOOP2",
+      "channel": 10,
+      "record_note": 41,
+      "play_note": 37,
+      "volume_cc": 31,
+      "volume_channel": 1
+    },
+    {
+      "name": "LOOP3",
+      "channel": 10,
+      "record_note": 42,
+      "play_note": 38,
+      "volume_cc": 32,
+      "volume_channel": 1
+    }
+  ],
+
+  "keyboard_enabled": true,
+
+  "keyboard_bindings": [
+    {
+      "key": "z",
+      "action": "note",
+      "midi_note": 60,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+    {
+      "key": "x",
+      "action": "note",
+      "midi_note": 62,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+    {
+      "key": "c",
+      "action": "note",
+      "midi_note": 64,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+    {
+      "key": "v",
+      "action": "note",
+      "midi_note": 65,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+    {
+      "key": "b",
+      "action": "note",
+      "midi_note": 67,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+    {
+      "key": "n",
+      "action": "note",
+      "midi_note": 69,
+      "velocity": 120,
+      "stop_on_release": true
+    },
+    {
+      "key": "m",
+      "action": "note",
+      "midi_note": 71,
+      "velocity": 120,
+      "stop_on_release": false
+    },
+
+    {
+      "key": "q",
+      "action": "special_note"
+    },
+    {
+      "key": "w",
+      "action": "special_note"
+    },
+    {
+      "key": "e",
+      "action": "special_note"
+    },
+
+    {
+      "key": "f1",
+      "action": "loop_record_toggle",
+      "loop_name": "LOOP1"
+    },
+    {
+      "key": "f2",
+      "action": "loop_play_toggle",
+      "loop_name": "LOOP1"
+    },
+    {
+      "key": "f3",
+      "action": "loop_record_toggle",
+      "loop_name": "LOOP2"
+    },
+    {
+      "key": "f4",
+      "action": "loop_play_toggle",
+      "loop_name": "LOOP2"
+    },
+    {
+      "key": "f5",
+      "action": "loop_record_toggle",
+      "loop_name": "LOOP3"
+    },
+    {
+      "key": "f6",
+      "action": "loop_play_toggle",
+      "loop_name": "LOOP3"
+    },
+
+    {
+      "key": "r",
+      "action": "master_record_toggle"
+    },
+    {
+      "key": "esc",
+      "action": "panic"
+    }
+  ],
+
+  "master_record_enabled": false,
+  "master_record_file": "master_take.wav",
+  "master_record_autoname": true
+}
