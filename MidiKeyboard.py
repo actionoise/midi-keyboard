@@ -160,7 +160,11 @@ def get_default_loops():
             "record_note": 40,
             "play_note": 36,
             "volume_cc": 30,
-            "volume_channel": 10
+            "volume_channel": 10,
+            "tempo_correction": False,
+            "target_bpm": 120.0,
+            "beats": 4.0,
+            "keep_original_if_invalid": True
         },
         {
             "name": "LOOP2",
@@ -168,7 +172,11 @@ def get_default_loops():
             "record_note": 41,
             "play_note": 37,
             "volume_cc": 31,
-            "volume_channel": 10
+            "volume_channel": 10,
+            "tempo_correction": False,
+            "target_bpm": 120.0,
+            "beats": 4.0,
+            "keep_original_if_invalid": True
         }
     ]
 
@@ -309,6 +317,10 @@ def normalize_loops_config(loops_cfg):
                 "play_note": int(loop.get("play_note")),
                 "volume_cc": int(loop.get("volume_cc")),
                 "volume_channel": int(loop.get("volume_channel", channel)),
+                "tempo_correction": bool(loop.get("tempo_correction", False)),
+                "target_bpm": float(loop.get("target_bpm", 120.0)),
+                "beats": float(loop.get("beats", 4.0)),
+                "keep_original_if_invalid": bool(loop.get("keep_original_if_invalid", True)),
             })
         except Exception as e:
             print(f"[LOOPS CONFIG] Loop ignorato: {loop} -> {e}")
@@ -427,20 +439,46 @@ class LoopSlot:
         self.name = name
         self.is_recording = False
         self.record_buffer = []
+
         self.sample = None
         self.enabled = False
-        self.pos = 0
+
+        self.pos = 0.0
         self.gain = 1.0
+
+        # tempo live
+        self.source_bpm = None
+        self.target_bpm = None
+        self.beats = 4.0
+        self.tempo_correction = False
 
     def clear_recording(self):
         self.record_buffer = []
 
     def has_sample(self):
-        return self.sample is not None and len(self.sample) > 0
+        return self.sample is not None and len(self.sample) > 1
 
     def set_sample(self, audio):
-        self.sample = audio
-        self.pos = 0
+        self.sample = audio.astype(np.float32)
+        self.pos = 0.0
+
+    def set_tempo_info(self, tempo_correction=False, source_bpm=None, target_bpm=None, beats=4.0):
+        self.tempo_correction = bool(tempo_correction)
+        self.source_bpm = float(source_bpm) if source_bpm is not None else None
+        self.target_bpm = float(target_bpm) if target_bpm is not None else None
+        self.beats = float(beats)
+
+    def get_speed_ratio(self):
+        if not self.tempo_correction:
+            return 1.0
+
+        if self.source_bpm is None or self.source_bpm <= 0:
+            return 1.0
+
+        if self.target_bpm is None or self.target_bpm <= 0:
+            return 1.0
+
+        return self.target_bpm / self.source_bpm
 
     def toggle_play(self):
         if not self.has_sample():
@@ -448,7 +486,7 @@ class LoopSlot:
 
         if not self.enabled:
             self.enabled = True
-            self.pos = 0
+            self.pos = 0.0
             return True, "PLAY"
         else:
             self.enabled = False
@@ -460,11 +498,26 @@ class LoopSlot:
         if not self.enabled or not self.has_sample():
             return out
 
+        speed = self.get_speed_ratio()
+        length = len(self.sample)
+
+        if length < 2:
+            return out
+
         for i in range(frames):
-            out[i] = self.sample[self.pos] * self.gain
-            self.pos += 1
-            if self.pos >= len(self.sample):
-                self.pos = 0
+            idx0 = int(self.pos) % length
+            idx1 = (idx0 + 1) % length
+            frac = self.pos - int(self.pos)
+
+            s0 = self.sample[idx0]
+            s1 = self.sample[idx1]
+            out[i] = ((1.0 - frac) * s0 + frac * s1) * self.gain
+
+            self.pos += speed
+            while self.pos >= length:
+                self.pos -= length
+            while self.pos < 0:
+                self.pos += length
 
         return out
 
@@ -556,13 +609,33 @@ class LowLatencySamplePlayer:
             self.loops_config = new_cfg
             self.loops = new_slots
 
+            for idx, loop_cfg in enumerate(self.loops_config):
+                slot = self.loops[idx]
+                tempo_correction = bool(loop_cfg.get("tempo_correction", False))
+                target_bpm = float(loop_cfg.get("target_bpm", 120.0))
+                beats = float(loop_cfg.get("beats", 4.0))
+
+                source_bpm = None
+                if slot.has_sample():
+                    duration_sec = len(slot.sample) / self.samplerate
+                    if duration_sec > 0 and beats > 0:
+                        source_bpm = (beats * 60.0) / duration_sec
+
+                slot.set_tempo_info(
+                    tempo_correction=tempo_correction,
+                    source_bpm=source_bpm,
+                    target_bpm=target_bpm,
+                    beats=beats
+                )
+
         print("[LOOPS] Config aggiornata")
         for loop_cfg in self.loops_config:
             print(
                 f"  {loop_cfg['name']} | CH:{loop_cfg['channel']} | "
                 f"REC:{loop_cfg['record_note']} ({note_name(loop_cfg['record_note'])}) | "
                 f"PLAY:{loop_cfg['play_note']} ({note_name(loop_cfg['play_note'])}) | "
-                f"VOL_CC:{loop_cfg['volume_cc']} | VOL_CH:{loop_cfg['volume_channel']}"
+                f"VOL_CC:{loop_cfg['volume_cc']} | VOL_CH:{loop_cfg['volume_channel']} | "
+                f"TEMPO_CORR:{loop_cfg['tempo_correction']} | BPM:{loop_cfg['target_bpm']} | BEATS:{loop_cfg['beats']}"
             )
 
     def update_keyboard_config(self, enabled, bindings):
@@ -885,6 +958,39 @@ class LowLatencySamplePlayer:
                 self.loops[loop_index].gain = gain
                 print(f"[{self.loops[loop_index].name}] Volume: {gain:.2f}")
 
+    def update_loop_tempo_runtime(self, loop_index, loop_cfg):
+        with self.lock:
+            if 0 <= loop_index < len(self.loops):
+                slot = self.loops[loop_index]
+
+                tempo_correction = bool(loop_cfg.get("tempo_correction", False))
+                target_bpm = float(loop_cfg.get("target_bpm", 120.0))
+                beats = float(loop_cfg.get("beats", 4.0))
+
+                if slot.has_sample():
+                    duration_sec = len(slot.sample) / self.samplerate
+                    if duration_sec > 0 and beats > 0:
+                        source_bpm = (beats * 60.0) / duration_sec
+                    else:
+                        source_bpm = None
+                else:
+                    source_bpm = None
+
+                slot.set_tempo_info(
+                    tempo_correction=tempo_correction,
+                    source_bpm=source_bpm,
+                    target_bpm=target_bpm,
+                    beats=beats
+                )
+
+                print(
+                    f"[{slot.name}] TEMPO LIVE | "
+                    f"enabled:{tempo_correction} | "
+                    f"source_bpm:{source_bpm} | "
+                    f"target_bpm:{target_bpm} | "
+                    f"beats:{beats}"
+                )
+
     def note_on(self, midi_note, velocity, force_stop_on_noteoff=None):
         special_cfg = self.special_notes_by_midi.get(int(midi_note))
         if special_cfg and special_cfg.get("enabled", False):
@@ -923,7 +1029,13 @@ class LowLatencySamplePlayer:
             self.special_note_active_voices = {}
         print("[PANIC] Tutte le note fermate")
 
-    def _toggle_recording_slot(self, slot):
+    def _apply_loop_tempo_correction(self, audio, loop_cfg):
+        return audio
+
+    def _toggle_recording_slot(self, loop_index):
+        slot = self.loops[loop_index]
+        loop_cfg = self.loops_config[loop_index]
+
         if not slot.is_recording:
             slot.clear_recording()
             slot.is_recording = True
@@ -933,7 +1045,7 @@ class LowLatencySamplePlayer:
 
             if len(slot.record_buffer) == 0:
                 slot.sample = None
-                slot.pos = 0
+                slot.pos = 0.0
                 print(f"\n[{slot.name}] Recording STOP - nessun audio registrato\n")
                 return
 
@@ -941,20 +1053,43 @@ class LowLatencySamplePlayer:
 
             if len(recorded) < 32:
                 slot.sample = None
-                slot.pos = 0
+                slot.pos = 0.0
                 print(f"\n[{slot.name}] Recording STOP - loop troppo corto\n")
                 return
 
             recorded = smooth_loop_edges(recorded, fade_len=256)
+            recorded = self._apply_loop_tempo_correction(recorded, loop_cfg)
+            recorded = smooth_loop_edges(recorded, fade_len=256)
+
             slot.set_sample(recorded)
 
+            tempo_correction = bool(loop_cfg.get("tempo_correction", False))
+            target_bpm = float(loop_cfg.get("target_bpm", 120.0))
+            beats = float(loop_cfg.get("beats", 4.0))
+
             duration_sec = len(slot.sample) / self.samplerate
+            source_bpm = None
+            if duration_sec > 0 and beats > 0:
+                source_bpm = (beats * 60.0) / duration_sec
+
+            slot.set_tempo_info(
+                tempo_correction=tempo_correction,
+                source_bpm=source_bpm,
+                target_bpm=target_bpm,
+                beats=beats
+            )
+
+            print(
+                f"[{slot.name}] LOOP BPM DETECTED | "
+                f"duration:{duration_sec:.3f}s | beats:{beats} | source_bpm:{source_bpm}"
+            )
+
             print(f"\n[{slot.name}] Recording STOP - loop salvato ({duration_sec:.2f} sec)\n")
 
     def toggle_recording(self, loop_index):
         with self.lock:
             if 0 <= loop_index < len(self.loops):
-                self._toggle_recording_slot(self.loops[loop_index])
+                self._toggle_recording_slot(loop_index)
 
     def toggle_loop_playback(self, loop_index):
         with self.lock:
@@ -1230,6 +1365,8 @@ def config_watcher(player, config_path, stop_event, threshold, skip_ms):
                     loops_json = json.dumps(cfg.get("loops", get_default_loops()), sort_keys=True)
                     if loops_json != last_loops_json:
                         player.update_loops_config(cfg.get("loops", get_default_loops()))
+                        for idx, loop_cfg in enumerate(cfg.get("loops", get_default_loops())):
+                            player.update_loop_tempo_runtime(idx, loop_cfg)
                         last_loops_json = loops_json
 
                     keyboard_enabled = bool(cfg.get("keyboard_enabled", False))
@@ -1280,6 +1417,7 @@ def print_usage():
     print("  - master recording da JSON")
     print("  - salvataggio automatico WAV")
     print("  - multiple special notes da JSON")
+    print("  - tempo loop live da JSON")
     print()
 
 
@@ -1433,6 +1571,9 @@ def main():
 
     player.update_special_notes(cfg, threshold=threshold, skip_ms=skip_ms)
     player.update_loops_config(cfg.get("loops", get_default_loops()))
+    for idx, loop_cfg in enumerate(cfg.get("loops", get_default_loops())):
+        player.update_loop_tempo_runtime(idx, loop_cfg)
+
     player.update_keyboard_config(cfg.get("keyboard_enabled", False), cfg.get("keyboard_bindings", get_default_keyboard_bindings()))
     player.update_master_record_config(
         enabled=cfg.get("master_record_enabled", False),
@@ -1473,7 +1614,10 @@ def main():
                 f"  {loop_cfg['name']} | CH {loop_cfg['channel']} | "
                 f"REC {loop_cfg['record_note']} ({note_name(loop_cfg['record_note'])}) | "
                 f"PLAY {loop_cfg['play_note']} ({note_name(loop_cfg['play_note'])}) | "
-                f"CC {loop_cfg['volume_cc']} | VOL_CH {loop_cfg.get('volume_channel', loop_cfg['channel'])}"
+                f"CC {loop_cfg['volume_cc']} | VOL_CH {loop_cfg.get('volume_channel', loop_cfg['channel'])} | "
+                f"TEMPO_CORR {loop_cfg.get('tempo_correction', False)} | "
+                f"BPM {loop_cfg.get('target_bpm', 120.0)} | "
+                f"BEATS {loop_cfg.get('beats', 4.0)}"
             )
         print()
         print("Special notes:")

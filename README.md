@@ -77,3 +77,22 @@ TROUBLESHOOTING
 Additional demonstration videos will be published soon to showcase the system in real-world scenarios.
 
 First Video demo: https://www.youtube.com/watch?v=o6R80QeBPDw
+
+
+--------------Upgrade-------------
+
+Add the BPM Special Function for change bpm on the Loop
+New Loop COnfiguration on json: 
+
+ {
+      "name": "LOOP1",
+      "channel": 10,
+      "record_note": 40,
+      "play_note": 36,
+      "volume_cc": 30,
+      "volume_channel": 1,
+      "tempo_correction": true ,
+      "target_bpm": 5.0,
+      "beats": 4.0,
+      "keep_original_if_invalid": true     
+    },
