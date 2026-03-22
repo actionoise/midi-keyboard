@@ -1,39 +1,39 @@
 {
-  "instrument_file": "DoPiano.wav",
+  "instrument_file": "SpaceShip.wav",
   "instrument_root_note": 60,
   "midi_device_id": 17,
   "skip_ms": 0.0,
-  "threshold": 0.01,
+  "threshold": 1000,
   "note_min": 36,
   "note_max": 96,
 
   "special_notes": [
     {
-      "name": "ORGAN_LOOP",
+      "name": "bass_LOOP",
       "enabled": true,
       "midi_note": 0,
       "keyboard_key": "q",
-      "file": "BassDanceqqqqqq.wav",
+      "file": "remast.wav",
       "volume": 1.0,
-      "loop": true,
+      "loop": false,
       "stop_on_release": false
     },
     {
-      "name": "FX_HIT",
-      "enabled": false,
+      "name": "clap_HIT",
+      "enabled": true,
       "midi_note": 0,
       "keyboard_key": "w",
-      "file": "example.wav",
+      "file": "wauuu.wav",
       "volume": 1.0,
-      "loop": true,
-      "stop_on_release": false
+      "loop": false,
+      "stop_on_release": true
     },
     {
       "name": "PAD_HOLD",
-      "enabled": false,
+      "enabled": true,
       "midi_note": 0,
       "keyboard_key": "e",
-      "file": "PadHold.wav",
+      "file": "OrganFantasy.wav",
       "volume": 0.8,
       "loop": false,
       "stop_on_release": true
@@ -65,8 +65,8 @@
       "play_note": 36,
       "volume_cc": 30,
       "volume_channel": 1,
-      "tempo_correction": true ,
-      "target_bpm": 5.0,
+      "tempo_correction": false ,
+      "target_bpm": 110.0,
       "beats": 4.0,
       "keep_original_if_invalid": true
     },
@@ -78,8 +78,8 @@
       "volume_cc": 31,
       "volume_channel": 1,
       "tempo_correction": false,
-      "target_bpm": 120.0,
-      "beats": 4.0,
+      "target_bpm": 3000.0,
+      "beats": 40.0,
       "keep_original_if_invalid": true
     },
     {
@@ -89,8 +89,8 @@
       "play_note": 38,
       "volume_cc": 32,
       "volume_channel": 1,
-      "tempo_correction": true,
-      "target_bpm": 90.0,
+      "tempo_correction": false,
+      "target_bpm": 80.0,
       "beats": 8.0,
       "keep_original_if_invalid": true
     }
@@ -203,7 +203,7 @@
     }
   ],
 
-  "master_record_enabled": false,
+  "master_record_enabled": true,
   "master_record_file": "master_take.wav",
   "master_record_autoname": true
 }
