@@ -235,6 +235,7 @@ def get_default_special_notes():
             "file": "OrganGame.wav",
             "volume": 1.0,
             "loop": False,
+            "repeat_count": 0,
             "stop_on_release": True
         }
     ]
@@ -366,6 +367,7 @@ def normalize_special_notes_config(special_notes_cfg):
                 "file": item.get("file"),
                 "volume": float(item.get("volume", 1.0)),
                 "loop": bool(item.get("loop", False)),
+                "repeat_count": int(item.get("repeat_count", 0)),
                 "stop_on_release": bool(item.get("stop_on_release", True)),
             })
         except Exception as e:
@@ -392,7 +394,16 @@ def key_to_string(key):
 
 
 class SampleVoice:
-    def __init__(self, data, velocity_gain, midi_note=None, stop_on_noteoff=False, loop_enabled=False, special_name=None):
+    def __init__(
+        self,
+        data,
+        velocity_gain,
+        midi_note=None,
+        stop_on_noteoff=False,
+        loop_enabled=False,
+        special_name=None,
+        repeat_count=0
+    ):
         self.data = data
         self.pos = 0
         self.gain = velocity_gain
@@ -401,6 +412,12 @@ class SampleVoice:
         self.loop_enabled = loop_enabled
         self.special_name = special_name
         self.stopped = False
+
+        # repeat_count:
+        # 0 = infinito se loop_enabled=True
+        # >0 = numero di cicli completi del sample
+        self.repeat_count = max(0, int(repeat_count))
+        self.completed_loops = 0
 
     def stop(self):
         self.stopped = True
@@ -426,10 +443,18 @@ class SampleVoice:
             return out, True
 
         for i in range(frames):
+            if self.stopped:
+                return out, True
+
             out[i] = self.data[self.pos] * self.gain
             self.pos += 1
+
             if self.pos >= len(self.data):
                 self.pos = 0
+                self.completed_loops += 1
+
+                if self.repeat_count > 0 and self.completed_loops >= self.repeat_count:
+                    return out, True
 
         return out, False
 
@@ -749,7 +774,8 @@ class LowLatencySamplePlayer:
                     print(
                         f"[SPECIAL NOTE {item_copy['name']}] caricata | "
                         f"midi:{item_copy.get('midi_note')} | key:{item_copy.get('keyboard_key')} | "
-                        f"loop:{item_copy.get('loop')} | stop_on_release:{item_copy.get('stop_on_release')}"
+                        f"loop:{item_copy.get('loop')} | repeat_count:{item_copy.get('repeat_count')} | "
+                        f"stop_on_release:{item_copy.get('stop_on_release')}"
                     )
                 except Exception as e:
                     print(f"[SPECIAL NOTE {item_copy['name']}] errore caricamento: {e}")
@@ -780,12 +806,13 @@ class LowLatencySamplePlayer:
         special_name = special_cfg.get("name")
         midi_note = special_cfg.get("midi_note")
         loop_enabled = bool(special_cfg.get("loop", False))
+        repeat_count = int(special_cfg.get("repeat_count", 0))
         stop_on_release = bool(special_cfg.get("stop_on_release", True))
         volume = float(special_cfg.get("volume", 1.0))
         gain = (velocity / 127.0) * volume
 
         with self.lock:
-            if loop_enabled and special_name in self.special_note_active_voices:
+            if loop_enabled and repeat_count == 0 and special_name in self.special_note_active_voices:
                 old_voice = self.special_note_active_voices[special_name]
                 old_voice.stop()
                 del self.special_note_active_voices[special_name]
@@ -798,13 +825,17 @@ class LowLatencySamplePlayer:
                 midi_note=midi_note,
                 stop_on_noteoff=stop_on_release or loop_enabled,
                 loop_enabled=loop_enabled,
-                special_name=special_name
+                special_name=special_name,
+                repeat_count=repeat_count
             )
             self.voices.append(voice)
 
             if loop_enabled:
-                self.special_note_active_voices[special_name] = voice
-                print(f"[SPECIAL NOTE {special_name}] LOOP START")
+                if repeat_count == 0:
+                    self.special_note_active_voices[special_name] = voice
+                    print(f"[SPECIAL NOTE {special_name}] LOOP START infinito")
+                else:
+                    print(f"[SPECIAL NOTE {special_name}] LOOP START x{repeat_count}")
             else:
                 print(f"[SPECIAL NOTE {special_name}] START")
 
@@ -1260,6 +1291,11 @@ class LowLatencySamplePlayer:
                 live_mix += chunk
                 if not finished:
                     alive.append(voice)
+                else:
+                    if voice.special_name in self.special_note_active_voices:
+                        if self.special_note_active_voices.get(voice.special_name) is voice:
+                            del self.special_note_active_voices[voice.special_name]
+                            print(f"[SPECIAL NOTE {voice.special_name}] LOOP END")
             self.voices = alive
 
             for loop_slot in self.loops:
@@ -1418,6 +1454,7 @@ def print_usage():
     print("  - salvataggio automatico WAV")
     print("  - multiple special notes da JSON")
     print("  - tempo loop live da JSON")
+    print("  - repeat_count per special notes")
     print()
 
 
@@ -1626,6 +1663,7 @@ def main():
                 f"  {sn.get('name')} | enabled:{sn.get('enabled')} | "
                 f"midi:{sn.get('midi_note')} | key:{sn.get('keyboard_key')} | "
                 f"file:{sn.get('file')} | loop:{sn.get('loop')} | "
+                f"repeat_count:{sn.get('repeat_count', 0)} | "
                 f"stop_on_release:{sn.get('stop_on_release')}"
             )
         print()

@@ -96,3 +96,18 @@ New Loop COnfiguration on json:
       "beats": 4.0,
       "keep_original_if_invalid": true     
     },
+---------------------Upgrade --------
+Add the option on json special note 
+
+"special_notes": [
+    {
+      "name": "bass_LOOP",
+      "enabled": true,
+      "midi_note": 0,
+      "keyboard_key": "q",
+      "file": "DrumLong.wav",
+      "volume": 1.0,
+      "loop": true,
+      "repeat_count": 1,   ///////////new repeat count on loop.
+      "stop_on_release": false
+    },
